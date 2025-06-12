@@ -4,17 +4,30 @@ from tkinter import ttk
 from tkinter import filedialog
 from tkcalendar import DateEntry
 import webbrowser
+import json 
+import os
 
 class Application:
-    def __init__(self, job_title='', company='', salary='', date='', resume='', status = 0): 
+    def __init__(self, job_title='', company='', salary='', date='', resume='', status = 0, notes=''): 
         self.job_title = job_title
         self.company = company
         self.salary = salary
         self.resume = resume
         self.date = date
         self.status = status
+        self.notes = notes
 
-job_app = {} 
+JOBS_FILE = "jobs.json" #Job data will be stoerd here
+
+if os.path.exists(JOBS_FILE): 
+    with open(JOBS_FILE, "r") as f: 
+        saved_jobs = json.load(f) 
+        job_app = {
+            k: Application(**v)
+            for k, v in saved_jobs.items()
+        }
+else:
+    job_app = {}
 
 def add_application():
     job_title = job_title_input.get()
@@ -23,12 +36,16 @@ def add_application():
     date = date_input.get()
     resume = resume_path.get()
     status = status_var.get()
+    notes = additional_info_input.get("1.0", END).strip()
 
-    new_job = Application(job_title, company, salary, date, resume, status) 
+    new_job = Application(job_title, company, salary, date, resume, status, notes) 
     job_app[job_title] = new_job 
     display(new_job) 
     table.insert("", "end", values=(new_job.job_title, new_job.company, new_job.salary, new_job.date, status_labels.get(new_job.status, ''))) 
     clear_input() 
+
+    with open(JOBS_FILE, "w") as f:
+        json.dump({k: vars(v) for k, v in job_app.items()}, f, indent=2)
 
 def resume(): 
     file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")],) 
@@ -104,7 +121,9 @@ def save_changes_notes():
         job_title = table.item(selected_item, 'values')[0]
         current_job = job_app.get(job_title)
         if current_job:
-            current_job.notes = additional_info_var.get() 
+            current_job.notes = additional_info_input.get("1.0", END).strip()
+            with open(JOBS_FILE, "w") as f:
+                json.dump({k: vars(v) for k, v in job_app.items()}, f, indent=2)
 
 def switch_to_menu_window():
     menu_window.tkraise() 
@@ -120,7 +139,6 @@ job_title_edit = StringVar()
 company_edit = StringVar()
 salary_edit = StringVar()
 date_input_edit = StringVar()
-additional_info_var = StringVar()
 resume_path = StringVar()
 
 status_var = IntVar()
@@ -204,6 +222,20 @@ status_combobox = ttk.Combobox(edit_window, values=['Applied', 'Rejected', 'Acce
 status_combobox.grid(row=4, column=1, padx=10, pady=5)
 
 notes_label = Label(menu_window, text='Notes').grid(row=11, column=0, padx=20, pady=5)
-additional_info_input = Text(menu_window, height=10, width=50, relief=GROOVE, borderwidth=5).grid(row=12, column=0, columnspan=70, padx=20, pady=5, sticky="nsew") 
+additional_info_input = Text(menu_window, height=10, width=50, borderwidth=5)
+additional_info_input.grid(row=12, column=0, columnspan=70, padx=20, pady=5, sticky="nsew")
+
+for job in job_app.values():
+    table.insert("", "end", values=(
+        job.job_title,
+        job.company,
+        job.salary,
+        job.date,
+        status_labels.get(job.status, '')
+    ))
+
+    if job.notes:
+        additional_info_input.insert("1.0", job.notes)
+
 
 window.mainloop()
